@@ -3,6 +3,3 @@
 
 # Ignore ipynb checkpoint files
 .ipynb_checkpoints
-
-# Ignore gitattributes
-.gitattributes
