@@ -1,0 +1,196 @@
+Антон Викторов, Вариант 5
+
+```{r}
+library(copula)
+```
+
+```{r}
+data <- readRDS('./8 - Copula/Copula_Test/var_10.rds')
+data_copy <- data
+names(data)
+```
+
+```{r}
+plot(data$predictor,data$output,main = 'predictor vs output', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+```
+```{r}
+e_cop <-pobs(cbind(data$predictor,data$output))
+plot(e_cop[,1],e_cop[,2],pch = 20,main ="empiric copula",col = "green", xlab = 'predictor', ylab = 'output')
+```
+
+```{r}
+#Normal copula
+  normal_copula<-normalCopula(param=0,dim=2)
+#Student copula
+  Clayton_copula <-ellipCopula(family = "t",param = 0,dim = 2)
+#Frank copula
+  Frank_copula<-frankCopula(param=5,dim=2)
+#Clayton
+  Clayton_copula<-claytonCopula(param=5,dim=2)
+```
+
+```{r}
+myFitCopula <- function(Clayton_copula,data,method = 'ml'){
+  tryCatch(#Сecuting more than one expression you need curly braces.
+    {
+      y = fitCopula(Clayton_copula,data,method)
+      return(y)
+    },
+    error=function(error_message) {
+      return(NA)
+    }
+  )
+}
+```
+
+```{r}
+clayton_fit<-myFitCopula(Clayton_copula,pobs(cbind(data_copy$predictor,data_copy$output)),"ml")
+if (is.na(clayton_fit)) {  
+   сlayton_loglik <- 0
+   clayton_parameters <- 4
+}   else {  
+   clayton_loglik <-clayton_fit@loglik
+   clayton_parameters <- clayton_fit@copula@parameters
+} 
+clayton_fit
+```
+
+```{r}
+data_fit <- cbind(data_copy$predictor,data_copy$output)
+fitCopula(normal_copula,pobs(data_fit),method='ml')
+```
+
+```{r}
+data_fit <- cbind(data_copy$predictor,data_copy$output)
+fitCopula(t_copula,pobs(data_fit),method='ml')
+```
+
+```{r}
+data_fit <- cbind(data_copy$predictor,data_copy$output)
+fitCopula(Frank_copula,pobs(data_fit),method='ml')
+```
+
+Больше всего подходит t-copula.
+
+```{r}
+cpl <- fitCopula(Clayton_copula,pobs(data_fit),method='ml')
+best_parameters <- cpl@copula@parameters
+best_parameters
+```
+
+```{r}
+Clayton_copula@parameters <- best_parameters
+persp(Clayton_copula, dCopula, main="Estimated Student copula",xlab="u", ylab="v", zlab="c(u,v)")
+```
+
+```{r}
+Simulated.studentCopula<-rCopula(5000,Clayton_copula)
+SimulatedN<-length(Simulated.studentCopula[,1])
+plot(Simulated.studentCopula,main="Simulated Student Copula",xlab="Variable 1",ylab="Variable 2")
+```
+
+```{r}
+  data$predictor_DistrType
+```
+
+```{r}
+  data$predictor_DistrParameters
+```
+
+```{r}
+  data$output_DistrType
+```
+
+```{r}
+data$output_DistrParameters
+```
+
+```{r}
+  predictor.copula <- pgamma(data$predictor,shape=data$predictor_DistrParameters[1],rate=data$predictor_DistrParameters[2])
+  output.copula <- plogis(data$output,location=data$output_DistrParameters[1], scale=data$output_DistrParameters[2])
+```
+
+```{r}
+plot(predictor.copula,output.copula,main = 'predictor vs output. Marginal Distribution Copula', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+```
+
+```{r}
+quantileLevel <- function(numCopula,copula, theta,alpha)
+{
+  if (numCopula == 1)
+  {
+#Gaussian    
+    q <- pnorm(qnorm(alpha) *sqrt(1-theta*theta)  + theta* qnorm(copula[,1]))
+  }
+  if (numCopula == 2)
+  {
+    nu <- theta[2]
+    mn <- theta[1]
+    k <- sqrt(
+    (nu + (qt(copula[,1], df=nu) ^ 2)) * (1 - mn ^ 2) / 
+        (nu + 1)
+    )
+    q <- pt(qt(alpha, nu + 1) * k + mn * qt(copula[,1], df=nu), df=nu)
+      #Student
+  }
+  if (numCopula == 3)
+  {
+    q <- -1 / theta * log(1 - (alpha * (1 - exp(-theta)))/(exp(-theta * copula[,1]) + alpha(1 - exp(-theta * copula[,1]))))
+    #Frank
+  }
+  if (numCopula == 4)
+  {
+    q <- ((alpha ^ (-theta / (1 + theta)) - 1) * copula[,1] ^ (-theta) + 1) ^ (-1/theta)
+    #Clayton
+  }
+  return(q)  
+}
+copula <- cbind(predictor.copula,output.copula)
+alpha <- 0.95
+quantile <- quantileLevel(2,copula, best_parameters,alpha)
+```
+
+```{r}
+(anomalindex <- which(copula[,2]>quantile))
+```
+
+
+```{r}
+plot(copula[,1],copula[,2],pch =20,col = "blue",main = "quatile level 95%")
+points(copula[,1],quantile,col = "green",pch = 20)
+points(copula[anomalindex,1],copula[anomalindex,2],col = "magenta",pch = 20)
+```
+
+```{r}
+plot(copula[,1],copula[,2],pch =20,col = "blue",main = "quatile level 95%")
+points(copula[,1],quantile,col = "green",pch = 20)
+points(copula[anomalindex,1],copula[anomalindex,2],col = "magenta",pch = 20)
+```
+
+```{r}
+plot(data$predictor,data$output,main = 'Anomal predictor and output', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+points(data$predictor[anomalindex],data$output[anomalindex],col = "magenta",pch = 20)
+```
+
+```{r}
+copulanum <- 3
+variant <- 10
+copulaNames <- c("normal", "student", "clayton","frank")
+copulaName <-copulaNames[copulanum]
+copulaName
+```
+
+```{r}
+anomal_predictor <- data$predictor[anomalindex]
+anomal_output <- data$output[anomalindex]
+myResult <- list(variant = variant,
+                 copulaName = copulaName,
+                 predictor.copula = predictor.copula,
+                 output.copula = output.copula,  
+                 best_parameters = best_parameters,
+                 anomal_predictor= anomal_predictor,
+                 anomal_output= anomal_output)
+
+saveRDS(myResult,"result.rds")
+```
+

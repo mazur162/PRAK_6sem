@@ -1,0 +1,231 @@
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(copula)
+library(latticeExtra)
+library("SciViews")
+```
+
+```{r}
+data <- readRDS('./8 - Copula/Copula_Test/var_10.rds')
+names(data)
+```
+
+```{r}
+print(data['predictor_DistrType'])
+print(data['predictor_DistrParameters'])
+print(data['output_DistrType'])
+print(data['output_DistrParameters'])
+```
+1.Постройте график predictor vs output
+
+```{r}
+plot(data$predictor,data$output,main = 'predictor vs output', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+```
+2.Постройте график эмпирической копулы, построенной с помощью метода pobs()
+
+```{r}
+predictor_output <- cbind(data$predictor,data$output)
+e_cop <-pobs(predictor_output)
+plot(e_cop[,1],e_cop[,2],pch = 21,main ="pobs(predictor vs output) ",col = "blue")
+```
+3.Создайте 4 объекта копул c произвольным значением параметра и размерности 2.
+
+```{r}
+#Normal copula
+  normal_copula<-normalCopula(param=0,dim=2)
+#Student copula
+  t_copula <-ellipCopula(family = "t",param = 0,dim = 2)
+#Frank copula
+  Frank_copula<-frankCopula(param=5,dim=2)
+#Clayton
+  Clayton_copula<-claytonCopula(param=5,dim=2)
+```
+
+4.Оцените по эмпирической копуле все четыре копулы, как это делалось в лекции, и выдайте оценку параметров.
+
+```{r}
+  Gaussian.Copula.fit<-fitCopula(normal_copula, 
+                               e_cop, 
+                               method = "ml",
+                               optim.method = "BFGS", 
+                               optim.control = list(maxit=1000))
+   parameters <- Gaussian.Copula.fit@copula@parameters
+   parameters
+```
+
+```{r}
+  Student.Copula.fit<-fitCopula(t_copula, 
+                               e_cop, 
+                               method = "ml",
+                               optim.method = "BFGS", 
+                               optim.control = list(maxit=1000))
+   parameters <- Student.Copula.fit@copula@parameters
+   parameters
+```
+
+```{r}
+  Frank.Copula.fit<-fitCopula(Frank_copula, 
+                               e_cop, 
+                               method = "ml",
+                               optim.method = "BFGS", 
+                               optim.control = list(maxit=1000))
+   parameters <- Frank.Copula.fit@copula@parameters
+   parameters
+```
+
+```{r}
+Clayton.Copula.fit<-fitCopula(Clayton_copula, 
+                              e_cop, 
+                              method = "ml",
+                              optim.method = "BFGS", 
+                              optim.control = list(maxit=1000))
+parameters <- Clayton.Copula.fit@copula@parameters
+parameters
+```
+5. Выберете наиболее адекватный к данным тип копулы
+5.1 Параметры выбранной копулы сохраните в переменную best_parameters.
+Сравним максимумы функции правдоподобия при каждой из них
+
+```{r}
+Gaussian.Copula.fit@loglik
+```
+
+```{r}
+Student.Copula.fit@loglik
+```
+
+```{r}
+Frank.Copula.fit@loglik
+```
+
+```{r}
+Clayton.Copula.fit@loglik
+```
+Лучше всего подходит копула Франка
+```{r}
+parameters <- Clayton.Copula.fit@copula@parameters
+(best_parameters <- parameters)
+```
+6.Постройте графики выбранной копулы с помощью методов persp(),contour().
+
+```{r}
+persp(Clayton_copula, dCopula, main="pdf",xlab="u", ylab="v", zlab="c(u,v)")
+```
+
+```{r}
+contour(Clayton_copula,dCopula, main="pdf",xlab="u", ylab="v")
+```
+7. Перейдите к копуле согласно частным распределениям predictor и output. Пусть в варианте частные распределения заданы такие
+
+```{r}
+predictor.copula <- pexp(data$predictor,rate = data$predictor_DistrParameters[2])
+output.copula <- plogis(data$output, location = data$output_DistrParameters[1], scale=data$output_DistrParameters[2])
+```
+
+```{r}
+data$output_DistrParameters[2]
+```
+
+8. Постройте копулу согласно частным распределениям
+
+```{r}
+plot(predictor.copula,output.copula,main = 'predictor vs output. Marginal Distribution Copula', col = 'green',pch = 20,xlab = 'predictor', ylab = 'output')
+```
+9.Вычислите квантиль для уровня 95%, для заданных частных распределений. Лучшей выбрана frank копула.
+
+```{r}
+quantileLevel <- function(numCopula,copula, theta,alpha)
+{
+  if (numCopula == 1)
+  {
+  #Gaussian    
+    q <- pnorm(qnorm(alpha) *sqrt(1-theta*theta)  + theta* qnorm(copula[,1]))
+  }
+  if (numCopula == 2)
+  {
+    #Student
+  }
+  if (numCopula == 3)
+  {
+    #Frank
+    q <- -(1/theta) * ln(1 - (alpha*(1 - exp(-theta)))/(exp(-theta*copula[,1]) + alpha*(1-exp(-theta*copula[,1]))))
+  }
+  if (numCopula == 4)
+  {
+    #Clayton
+  }
+  return(q)  
+}
+```
+
+```{r}
+copula <- cbind(predictor.copula,output.copula)
+alpha <- 0.95
+copulanum <- 3
+parameters <- Clayton.Copula.fit@copula@parameters
+quantile <- quantileLevel(copulanum,copula, parameters,alpha)
+```
+
+10. Определите аномальные пары переменных для которых переменная output в копуле превосходит квантиль. Определяем индексы таких переменных.
+
+
+```{r}
+(anomalindex <- which(copula[,2]>quantile))
+```
+Рисуем копулу, цветом выделяем аномальные значения
+
+```{r}
+plot(copula[,1],copula[,2],pch =20,col = "blue",main = "quatile level 95%")
+points(copula[,1],quantile,col = "green",pch = 20)
+points(copula[anomalindex,1],copula[anomalindex,2],col = "magenta",pch = 20)
+```
+11.Находим аномальные переменные в исходных pedictor и output.
+
+```{r}
+anomal_predictor <- data$predictor[anomalindex]
+anomal_output    <- data$output[anomalindex]
+head(anomal_predictor)
+```
+
+```{r}
+head(anomal_output)
+```
+Выделим цветом пары аномальных переменных
+
+```{r}
+plot(predictor_output[,1], predictor_output[,2],pch = 21,col= "blue",main ="Predictors vs Output.Anomalies")
+points(anomal_predictor, anomal_output,pch = 21,col= "magenta")
+```
+
+```{r}
+variant <- 10
+copulanum <- 4
+```
+
+```{r}
+copulaNames <- c("normal", "student","frank", "clayton")
+copulaName <-copulaNames[copulanum]
+copulaName
+```
+
+```{r}
+myResult <- list(variant = variant,
+                 copulaName = copulaName,
+                 predictor.copula = predictor.copula,
+                 output.copula = output.copula,  
+                 best_parameters = best_parameters,
+                 anomal_predictor= anomal_predictor,
+                 anomal_output= anomal_output)
+
+```
+
+```{r}
+saveRDS(myResult,"result.rds")
+
+```
+
+```{r}
+
+```

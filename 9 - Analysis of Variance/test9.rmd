@@ -1,0 +1,43 @@
+```{r}
+filename='./TestFiles/var_10.csv'
+Sample<- read.table(filename,header = TRUE,sep =",");
+Sample
+```
+
+
+```{r}
+Sample<-data.frame(Output=Sample$Output,Treatment=as.factor(Sample$Treatment))
+Sample
+```
+
+
+```{r}
+g <- lm(Output ~ Treatment, Sample)
+summary(g)
+```
+
+
+```{r}
+anova(g)
+```
+
+```{r}
+(anovag_Sum_Sq_2 <- anova(g)$"Sum Sq"[2])
+(anovag_Sum_Sq_1 <- anova(g)$"Sum Sq"[1])
+(anovag_PValue<- anova(g)$"Pr(>F)"[1])
+```
+
+
+
+
+```{r}
+gi <- lm(Output ~ Treatment -1, Sample)
+summary(gi)
+```
+
+```{r}
+(anovamgi_Sum_Sq_1 <- anova(gi)$"Sum Sq"[1])
+(anovagi_Sum_Sq_2<- anova(gi)$"Sum Sq"[2])
+(anovagi_PValue <- anova(gi)$"Pr(>F)"[1])
+```
+
